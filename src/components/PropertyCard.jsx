@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function PropertyCard({ property, isFavorited = false, onToggle }) {
   const [favorited, setFavorited] = useState(isFavorited);
+  const navigate = useNavigate();
 
   useEffect(() => {
     setFavorited(isFavorited);
@@ -16,11 +18,18 @@ export default function PropertyCard({ property, isFavorited = false, onToggle }
     }
   };
 
+  const handleBookNow = (e) => {
+    e.preventDefault();
+    // Store property details for booking
+    localStorage.setItem('selectedProperty', JSON.stringify(property));
+    navigate('/booking');
+  };
+
   return (
     <div className="property-card" data-address={property.dataAddress} data-phone={property.dataPhone}>
-      <a href={property.link || '#'}>
+      <Link to="/listings">
         <img src={property.imgSrc} alt={property.imgAlt} />
-      </a>
+      </Link>
       <button 
         className={`fav-button ${favorited ? 'favorited' : ''}`} 
         onClick={handleFavoriteToggle} 
@@ -40,7 +49,7 @@ export default function PropertyCard({ property, isFavorited = false, onToggle }
           <h3>{property.title}</h3>
           <p className="price">{property.price}</p>
         </div>
-        <a className="book-now-btn" href={property.bookLink || '#'}>Book Now</a>
+        <button className="book-now-btn" onClick={handleBookNow}>Book Now</button>
       </div>
     </div>
   );

@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
 
 export default function Header() {
   const { user, logout: logoutUser } = useUser();
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef();
+  const location = useLocation();
 
   useEffect(() => {
     function onDoc(e) {
@@ -24,7 +25,12 @@ export default function Header() {
     setOpen(false);
   };
 
-  const initials = user ? (user.username || 'U').split(' ').map(s => s[0]).join('').slice(0,2).toUpperCase() : null
+  const initials = user ? (user.username || 'U').split(' ').map(s => s[0]).join('').slice(0,2).toUpperCase() : null;
+
+  // Function to check if a link is active
+  const isActive = (path) => {
+    return location.pathname === path;
+  };
 
   return (
     <header>
@@ -37,19 +43,19 @@ export default function Header() {
         </div>
         <nav>
           <ul>
-            <li><Link to="/" className="active">Home</Link></li>
-            <li><Link to="/about">About Us</Link></li>
-            <li><Link to="/services">Services</Link></li>
-            <li><Link to="/faq">FAQ</Link></li>
-            <li><a href="#">Listings</a></li>
-            <li><Link to="/contact">Contact</Link></li>
+            <li><Link to="/" className={isActive('/') ? 'active' : ''}>Home</Link></li>
+            <li><Link to="/about" className={isActive('/about') ? 'active' : ''}>About Us</Link></li>
+            <li><Link to="/services" className={isActive('/services') ? 'active' : ''}>Services</Link></li>
+            <li><Link to="/faq" className={isActive('/faq') ? 'active' : ''}>FAQ</Link></li>
+            <li><Link to="/listings" className={isActive('/listings') ? 'active' : ''}>Listings</Link></li>
+            <li><Link to="/contact" className={isActive('/contact') ? 'active' : ''}>Contact</Link></li>
             <li style={{position:'relative'}} ref={dropdownRef}>
               {user ? (
                 <a href="#" onClick={(e)=>{e.preventDefault(); setOpen(o=>!o)}} aria-haspopup="true" aria-expanded={open} id="loginLink">
                   <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:40,height:40,borderRadius:'50%',background: open ? 'var(--primary-color)' : 'transparent', color: open ? '#fff' : 'var(--dark-bg)'}}>{initials}</span>
                 </a>
               ) : (
-                <a href="log.html" id="loginLink"><i className="fas fa-user"></i> <span id="loginText">Log in</span></a>
+                <Link to="/login" id="loginLink"><i className="fas fa-user"></i> <span id="loginText">Log in</span></Link>
               )}
 
               {user && (
@@ -58,8 +64,8 @@ export default function Header() {
                     <strong id="profileName">{user.username || 'Account'}</strong>
                     <small id="profileEmail" style={{display:'block',color:'#666'}}>{user.email || ''}</small>
                   </div>
-                  <a href="profile.html">Profile</a>
-                  <a href="fav.html"><i className="fas fa-heart" style={{marginRight:8}}></i> Favorites</a>
+                  <Link to="/profile" className={isActive('/profile') ? 'active' : ''}>Profile</Link>
+                  <Link to="/favorites" className={isActive('/favorites') ? 'active' : ''}><i className="fas fa-heart" style={{marginRight:8}}></i> Favorites</Link>
                   <a href="#" id="historyLink"><i className="fas fa-history" style={{marginRight:8}}></i> History</a>
                   <a href="#" className="signout-btn" onClick={logout}><i className="fas fa-sign-out-alt" style={{marginRight:8}}></i> Sign Out</a>
                 </div>

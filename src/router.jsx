@@ -5,6 +5,10 @@ import About from './pages/About';
 import Services from './pages/Services';
 import FAQ from './pages/FAQ';
 import Contact from './pages/Contact';
+import Profile from './pages/Profile';
+import Favorites from './pages/Favorites';
+import Login from './pages/Login';
+import Listings from './pages/Listings';
 import ErrorBoundary from './components/ErrorBoundary';
 
 export default function Router() {
@@ -17,6 +21,10 @@ export default function Router() {
           <Route path="/services" element={<Services />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/favorites" element={<Favorites />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/listings" element={<Listings />} />
         </Routes>
       </BrowserRouter>
     </ErrorBoundary>
