@@ -66,7 +66,7 @@ export default function Header() {
                   </div>
                   <Link to="/profile" className={isActive('/profile') ? 'active' : ''}>Profile</Link>
                   <Link to="/favorites" className={isActive('/favorites') ? 'active' : ''}><i className="fas fa-heart" style={{marginRight:8}}></i> Favorites</Link>
-                  <a href="#" id="historyLink"><i className="fas fa-history" style={{marginRight:8}}></i> History</a>
+                  <Link to="/profile#bookingHistory" className={isActive('/profile') ? 'active' : ''}><i className="fas fa-history" style={{marginRight:8}}></i> History</Link>
                   <a href="#" className="signout-btn" onClick={logout}><i className="fas fa-sign-out-alt" style={{marginRight:8}}></i> Sign Out</a>
                 </div>
               )}

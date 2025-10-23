@@ -9,6 +9,8 @@ import Profile from './pages/Profile';
 import Favorites from './pages/Favorites';
 import Login from './pages/Login';
 import Listings from './pages/Listings';
+import Booking from './pages/Booking';
+import Landlord from './pages/Landlord';
 import ErrorBoundary from './components/ErrorBoundary';
 
 export default function Router() {
@@ -25,6 +27,8 @@ export default function Router() {
           <Route path="/favorites" element={<Favorites />} />
           <Route path="/login" element={<Login />} />
           <Route path="/listings" element={<Listings />} />
+          <Route path="/booking" element={<Booking />} />
+          <Route path="/landlord" element={<Landlord />} />
         </Routes>
       </BrowserRouter>
     </ErrorBoundary>

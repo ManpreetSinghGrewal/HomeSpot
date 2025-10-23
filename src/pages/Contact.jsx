@@ -20,8 +20,22 @@ export default function Contact() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Handle form submission here
+    
+    // Store contact message in localStorage (simulating form submission)
+    const contactMessages = JSON.parse(localStorage.getItem('contactMessages')) || [];
+    const newMessage = {
+      id: Date.now(),
+      ...formData,
+      timestamp: new Date().toISOString()
+    };
+    
+    contactMessages.push(newMessage);
+    localStorage.setItem('contactMessages', JSON.stringify(contactMessages));
+    
+    // Show success message
     alert('Thank you for your message! We will get back to you soon.');
+    
+    // Reset form
     setFormData({
       name: '',
       email: '',

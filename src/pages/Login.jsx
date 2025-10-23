@@ -174,7 +174,7 @@ export default function Login() {
     setLoading(false);
     
     // Redirect based on role
-    navigate(userObj.role === 'landlord' ? '/landlord' : '/profile');
+    navigate(userObj.role === 'landlord' ? '/landlord' : '/');
   };
 
   // Handle login form submission
@@ -678,7 +678,12 @@ export default function Login() {
                     </button>
                     
                     <p style={{ margin: '1rem 0', fontSize: '.9rem', textAlign: 'center' }}>
-                      <b style={{ color: 'var(--primary-color)' }}>Forgot password?</b>
+                      <b 
+                        style={{ color: 'var(--primary-color)', cursor: 'pointer' }}
+                        onClick={() => alert('Password reset feature coming soon! For now, please create a new account.')}
+                      >
+                        Forgot password?
+                      </b>
                     </p>
                     
                     <p style={{ margin: '1rem 0', fontSize: '.9rem', textAlign: 'center' }}>
