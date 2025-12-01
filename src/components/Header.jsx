@@ -6,6 +6,7 @@ import { useUser } from '../contexts/UserContext';
 export default function Header() {
   const { user, logout: logoutUser } = useUser();
   const [open, setOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const dropdownRef = useRef();
   const location = useLocation();
 
@@ -18,6 +19,11 @@ export default function Header() {
     document.addEventListener('click', onDoc);
     return () => document.removeEventListener('click', onDoc);
   }, []);
+
+  // Close mobile nav on route change
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   const logout = (e) => {
     e.preventDefault();
@@ -42,7 +48,18 @@ export default function Header() {
           </Link>
         </div>
         <nav>
-          <ul>
+          <button
+            type="button"
+            className={`nav-toggle ${mobileNavOpen ? 'open' : ''}`}
+            onClick={() => setMobileNavOpen(v => !v)}
+            aria-label="Toggle navigation"
+            aria-expanded={mobileNavOpen}
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          <ul className={`nav-links ${mobileNavOpen ? 'nav-links-open' : ''}`}>
             <li><Link to="/" className={isActive('/') ? 'active' : ''}>Home</Link></li>
             <li><Link to="/about" className={isActive('/about') ? 'active' : ''}>About Us</Link></li>
             <li><Link to="/services" className={isActive('/services') ? 'active' : ''}>Services</Link></li>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import './FAQ.css';
 
 export default function FAQ() {
   const [openIndex, setOpenIndex] = useState(null);
@@ -57,54 +58,22 @@ export default function FAQ() {
     <>
       <Header />
       <main>
-        <section className="page-hero" style={{padding:'60px 20px',textAlign:'center',color:'#edf2f4',background:'linear-gradient(90deg, #2b2d42, #4a4e69)'}}>
+        <section className="faq-hero">
           <h1>Frequently Asked Questions</h1>
-          <p style={{fontSize:'1.2rem',marginTop:'1rem'}}>Find answers to common questions about our services</p>
+          <p>Find answers to common questions about our services</p>
         </section>
 
-        <section className="faq-section" style={{padding:'80px 0'}}>
+        <section className="faq-section">
           <div className="container">
-            <div className="faq-container" style={{maxWidth:'800px',margin:'0 auto'}}>
+            <div className="faq-container">
               {faqs.map((faq, index) => (
-                <div key={index} className="faq-item" style={{
-                  background:'#fff',
-                  marginBottom:'20px',
-                  borderRadius:'8px',
-                  boxShadow:'0 2px 10px rgba(0,0,0,0.1)',
-                  overflow:'hidden'
-                }}>
-                  <button
-                    onClick={() => toggleFAQ(index)}
-                    style={{
-                      width:'100%',
-                      padding:'25px 30px',
-                      background:'transparent',
-                      border:'none',
-                      textAlign:'left',
-                      cursor:'pointer',
-                      display:'flex',
-                      justifyContent:'space-between',
-                      alignItems:'center',
-                      fontSize:'1.1rem',
-                      fontWeight:'600',
-                      color:'#2b2d42',
-                      transition:'background 0.3s ease'
-                    }}
-                  >
+                <div key={index} className="faq-item">
+                  <button className="faq-question" onClick={() => toggleFAQ(index)} aria-expanded={openIndex === index}>
                     <span>{faq.question}</span>
-                    <i className={`fas fa-chevron-${openIndex === index ? 'up' : 'down'}`} style={{
-                      color:'var(--primary-color)',
-                      fontSize:'1rem',
-                      transition:'transform 0.3s ease'
-                    }}></i>
+                    <i className={`fas fa-chevron-${openIndex === index ? 'up' : 'down'}`}></i>
                   </button>
                   {openIndex === index && (
-                    <div style={{
-                      padding:'0 30px 25px',
-                      color:'#666',
-                      lineHeight:'1.6',
-                      borderTop:'1px solid #f0f0f0'
-                    }}>
+                    <div className="faq-answer">
                       {faq.answer}
                     </div>
                   )}
@@ -114,21 +83,11 @@ export default function FAQ() {
           </div>
         </section>
 
-        <section className="contact-cta" style={{padding:'60px 0',background:'#f8f9fa'}}>
-          <div className="container" style={{textAlign:'center'}}>
-            <h2 style={{fontSize:'2rem',marginBottom:'15px',color:'#2b2d42'}}>Still have questions?</h2>
-            <p style={{fontSize:'1.1rem',marginBottom:'25px',color:'#666'}}>Our support team is here to help you 24/7</p>
-            <Link to="/contact" style={{
-              display:'inline-block',
-              padding:'15px 35px',
-              fontSize:'1rem',
-              fontWeight:'600',
-              color:'#fff',
-              background:'var(--primary-color)',
-              borderRadius:'8px',
-              textDecoration:'none',
-              transition:'background 0.3s, transform 0.2s'
-            }}>
+        <section className="contact-cta">
+          <div className="container">
+            <h2>Still have questions?</h2>
+            <p>Our support team is here to help you 24/7</p>
+            <Link to="/contact" className="cta-btn">
               Contact Support
             </Link>
           </div>
