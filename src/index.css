@@ -60,7 +60,12 @@ header .container {
   padding: 0 20px;
 }
 
-nav ul {
+nav {
+  position: relative;
+}
+
+nav ul,
+nav .nav-links {
   display: flex;
   gap: 8px;
   list-style: none;
@@ -81,19 +86,21 @@ nav .nav-toggle {
   border: none;
   background: transparent;
   cursor: pointer;
+  z-index: 1001;
+  position: relative;
 }
 
 nav .nav-toggle span {
   display: block;
-  width: 20px;
-  height: 2px;
+  width: 24px;
+  height: 3px;
   background: var(--dark-bg);
   border-radius: 999px;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
 nav .nav-toggle.open span:nth-child(1) {
-  transform: translateY(6px) rotate(45deg);
+  transform: translateY(7px) rotate(45deg);
 }
 
 nav .nav-toggle.open span:nth-child(2) {
@@ -101,7 +108,7 @@ nav .nav-toggle.open span:nth-child(2) {
 }
 
 nav .nav-toggle.open span:nth-child(3) {
-  transform: translateY(-6px) rotate(-45deg);
+  transform: translateY(-7px) rotate(-45deg);
 }
 
 .nav-links {
@@ -476,34 +483,53 @@ footer {
   }
   
   nav .nav-toggle {
-    display: inline-flex;
+    display: inline-flex !important;
   }
 
-  .nav-links {
-    position: absolute;
-    top: 70px;
-    right: 0;
+  nav ul,
+  nav .nav-links {
+    position: fixed;
+    top: 60px;
     left: 0;
+    right: 0;
     flex-direction: column;
     gap: 0;
     background: #fff;
     border-bottom: 1px solid #eee;
     box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+    padding: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+    opacity: 0;
+    z-index: 1000;
+  }
+
+  nav .nav-links.nav-links-open {
+    max-height: 500px;
+    opacity: 1;
     padding: 8px 12px 12px;
-    display: none;
   }
 
-  .nav-links.nav-links-open {
-    display: flex;
-  }
-
-  .nav-links li {
+  nav .nav-links li {
     width: 100%;
+    border-bottom: 1px solid #f0f0f0;
   }
 
-  .nav-links a {
+  nav .nav-links li:last-child {
+    border-bottom: none;
+  }
+
+  nav .nav-links a {
     display: block;
     width: 100%;
+    padding: 15px 16px;
+    border-radius: 0;
+  }
+
+  nav .nav-links a:hover {
+    background: var(--secondary-bg);
+    transform: none;
   }
   
   .container {
@@ -549,6 +575,11 @@ footer {
   
   .logo img {
     height: 28px;
+  }
+
+  nav ul,
+  nav .nav-links {
+    top: 55px;
   }
   
   .property-card {
