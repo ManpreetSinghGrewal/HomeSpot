@@ -478,4 +478,3 @@ export default function Profile() {
     </>
   );
 }
-attached screenshot , my code isnt giving me responsive part, make it responsive 
