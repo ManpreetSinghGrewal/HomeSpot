@@ -1,19 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
+import { useToast } from '../components/Toast';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 
 export default function Listings() {
   const { user } = useUser();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   
   // State for search and filtering
   const [searchFilters, setSearchFilters] = useState({
     city: '',
-    rooms: ''
+    rooms: '',
+    minPrice: '',
+    maxPrice: ''
   });
+  
+  // State for sorting
+  const [sortBy, setSortBy] = useState('default');
+  
+  // State for comparison
+  const [comparisonProperties, setComparisonProperties] = useState([]);
+  const [showComparison, setShowComparison] = useState(false);
   
   // State for pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -26,6 +37,9 @@ export default function Listings() {
   // State for results display
   const [resultsTitle, setResultsTitle] = useState('All Properties');
   const [resultsCount, setResultsCount] = useState(0);
+  
+  // State for property detail modal
+  const [selectedProperty, setSelectedProperty] = useState(null);
 
   // Sample property data (you can expand this with more properties for pagination)
   const allProperties = [
@@ -266,31 +280,86 @@ export default function Listings() {
     }
   ];
 
+  // Helper function to extract price number from price string
+  const getPriceNumber = (priceString) => {
+    const match = priceString.match(/₹([\d,]+)/);
+    return match ? parseInt(match[1].replace(/,/g, '')) : 0;
+  };
+
+  // Track recently viewed properties
+  const addToRecentlyViewed = (property) => {
+    const recentlyViewed = JSON.parse(localStorage.getItem('recentlyViewed')) || [];
+    const filtered = recentlyViewed.filter(p => p.id !== property.id);
+    filtered.unshift({ ...property, viewedAt: Date.now() });
+    const limited = filtered.slice(0, 5); // Keep only 5 most recent
+    localStorage.setItem('recentlyViewed', JSON.stringify(limited));
+  };
+
   // Initialize filters from URL parameters
   useEffect(() => {
     const cityParam = searchParams.get('city');
     const roomParam = searchParams.get('room');
     const pageParam = searchParams.get('page');
+    const minPriceParam = searchParams.get('minPrice');
+    const maxPriceParam = searchParams.get('maxPrice');
+    const sortParam = searchParams.get('sort');
     
-    if (cityParam || roomParam || pageParam) {
+    if (cityParam || roomParam || pageParam || minPriceParam || maxPriceParam || sortParam) {
       setSearchFilters({
         city: cityParam || '',
-        rooms: roomParam || ''
+        rooms: roomParam || '',
+        minPrice: minPriceParam || '',
+        maxPrice: maxPriceParam || ''
       });
       setCurrentPage(parseInt(pageParam) || 1);
+      if (sortParam) setSortBy(sortParam);
     }
   }, [searchParams]);
 
-  // Filter properties based on search criteria
+  // Filter and sort properties based on search criteria
   useEffect(() => {
-    let filtered = allProperties;
+    let filtered = [...allProperties];
     
+    // Apply filters
     if (searchFilters.city) {
       filtered = filtered.filter(property => property.city === searchFilters.city);
     }
     
     if (searchFilters.rooms) {
       filtered = filtered.filter(property => property.rooms >= parseInt(searchFilters.rooms));
+    }
+    
+    // Price filter
+    if (searchFilters.minPrice) {
+      const minPrice = parseInt(searchFilters.minPrice.replace(/,/g, ''));
+      filtered = filtered.filter(property => getPriceNumber(property.price) >= minPrice);
+    }
+    
+    if (searchFilters.maxPrice) {
+      const maxPrice = parseInt(searchFilters.maxPrice.replace(/,/g, ''));
+      filtered = filtered.filter(property => getPriceNumber(property.price) <= maxPrice);
+    }
+    
+    // Apply sorting
+    if (sortBy !== 'default') {
+      filtered.sort((a, b) => {
+        switch (sortBy) {
+          case 'price-asc':
+            return getPriceNumber(a.price) - getPriceNumber(b.price);
+          case 'price-desc':
+            return getPriceNumber(b.price) - getPriceNumber(a.price);
+          case 'rooms-asc':
+            return a.rooms - b.rooms;
+          case 'rooms-desc':
+            return b.rooms - a.rooms;
+          case 'sqft-asc':
+            return parseInt(a.sqft.replace(/,/g, '')) - parseInt(b.sqft.replace(/,/g, ''));
+          case 'sqft-desc':
+            return parseInt(b.sqft.replace(/,/g, '')) - parseInt(a.sqft.replace(/,/g, ''));
+          default:
+            return 0;
+        }
+      });
     }
     
     setFilteredProperties(filtered);
@@ -309,7 +378,7 @@ export default function Listings() {
     
     setResultsTitle(titleText);
     setResultsCount(filtered.length);
-  }, [searchFilters]);
+  }, [searchFilters, sortBy]);
 
   // Calculate pagination
   useEffect(() => {
@@ -326,14 +395,48 @@ export default function Listings() {
     const newParams = new URLSearchParams();
     if (searchFilters.city) newParams.set('city', searchFilters.city);
     if (searchFilters.rooms) newParams.set('rooms', searchFilters.rooms);
+    if (searchFilters.minPrice) newParams.set('minPrice', searchFilters.minPrice);
+    if (searchFilters.maxPrice) newParams.set('maxPrice', searchFilters.maxPrice);
+    if (sortBy !== 'default') newParams.set('sort', sortBy);
     if (currentPage > 1) newParams.set('page', currentPage.toString());
+    
+    // Save search preferences
+    if (user) {
+      localStorage.setItem('savedSearch', JSON.stringify({
+        filters: searchFilters,
+        sortBy: sortBy,
+        savedAt: Date.now()
+      }));
+    }
     
     setSearchParams(newParams);
   };
 
+  // Load saved search preferences
+  useEffect(() => {
+    if (user && !searchParams.toString()) {
+      const savedSearch = localStorage.getItem('savedSearch');
+      if (savedSearch) {
+        try {
+          const search = JSON.parse(savedSearch);
+          // Only load if saved within last 7 days
+          if (Date.now() - search.savedAt < 7 * 24 * 60 * 60 * 1000) {
+            setSearchFilters(search.filters);
+            if (search.sortBy) setSortBy(search.sortBy);
+            showToast('Loaded saved search preferences', 'info');
+          }
+        } catch (e) {
+          console.error('Error loading saved search:', e);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   // Handle clear filters
   const handleClearFilters = () => {
-    setSearchFilters({ city: '', rooms: '' });
+    setSearchFilters({ city: '', rooms: '', minPrice: '', maxPrice: '' });
+    setSortBy('default');
     setCurrentPage(1);
     setSearchParams({});
   };
@@ -348,14 +451,22 @@ export default function Listings() {
 
   // Handle booking
   const handleBooking = (property) => {
-    // Store property details for booking
+    addToRecentlyViewed(property);
     localStorage.setItem('selectedProperty', JSON.stringify(property));
     navigate('/booking');
   };
 
+  // Handle view property details
+  const handleViewDetails = (property) => {
+    addToRecentlyViewed(property);
+    setSelectedProperty(property);
+  };
+
   // Handle add to favorites
-  const handleAddToFavorites = (property) => {
+  const handleAddToFavorites = (property, e) => {
+    e?.stopPropagation();
     if (!user) {
+      showToast('Please login to add favorites', 'warning');
       navigate('/login');
       return;
     }
@@ -379,11 +490,55 @@ export default function Listings() {
       favorites.push(favoriteProperty);
       localStorage.setItem('favorites', JSON.stringify(favorites));
       
-      // Show success message
-      alert('Property added to favorites!');
+      showToast('Property added to favorites!', 'success');
     } else {
-      alert('Property is already in your favorites!');
+      showToast('Property is already in your favorites!', 'info');
     }
+  };
+
+  // Handle add to comparison
+  const handleToggleComparison = (property, e) => {
+    e?.stopPropagation();
+    const isInComparison = comparisonProperties.some(p => p.id === property.id);
+    
+    if (isInComparison) {
+      setComparisonProperties(prev => prev.filter(p => p.id !== property.id));
+      showToast('Removed from comparison', 'info');
+    } else {
+      if (comparisonProperties.length >= 3) {
+        showToast('You can compare maximum 3 properties', 'warning');
+        return;
+      }
+      setComparisonProperties(prev => [...prev, property]);
+      showToast('Added to comparison', 'success');
+    }
+  };
+
+  // Handle share property
+  const handleShare = (property, e) => {
+    e?.stopPropagation();
+    const shareUrl = `${window.location.origin}/listings?property=${property.id}`;
+    
+    if (navigator.share) {
+      navigator.share({
+        title: property.title,
+        text: `Check out this property: ${property.title}`,
+        url: shareUrl
+      }).catch(() => {
+        copyToClipboard(shareUrl);
+      });
+    } else {
+      copyToClipboard(shareUrl);
+    }
+  };
+
+  // Copy to clipboard
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('Link copied to clipboard!', 'success');
+    }).catch(() => {
+      showToast('Failed to copy link', 'error');
+    });
   };
 
   // Calculate pagination info
@@ -422,16 +577,16 @@ export default function Listings() {
                 marginBottom: '25px',
                 color: 'var(--dark-bg)'
               }}>
-                Search Properties by City & Room Number
+                Search & Filter Properties
               </h2>
               
               <div className="search-form" style={{
-                display: 'flex',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
                 gap: '15px',
-                justifyContent: 'center',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                marginBottom: '20px'
+                marginBottom: '20px',
+                maxWidth: '900px',
+                margin: '0 auto 20px auto'
               }}>
                 <select 
                   value={searchFilters.city}
@@ -443,7 +598,6 @@ export default function Listings() {
                     borderRadius: '8px',
                     fontSize: '1rem',
                     fontFamily: "'Poppins', sans-serif",
-                    minWidth: '180px',
                     background: '#fff',
                     transition: 'border-color 0.3s ease'
                   }}
@@ -465,7 +619,6 @@ export default function Listings() {
                     borderRadius: '8px',
                     fontSize: '1rem',
                     fontFamily: "'Poppins', sans-serif",
-                    minWidth: '180px',
                     background: '#fff',
                     transition: 'border-color 0.3s ease'
                   }}
@@ -478,6 +631,62 @@ export default function Listings() {
                   <option value="5">5+ Rooms</option>
                 </select>
                 
+                <input
+                  type="text"
+                  placeholder="Min Price (₹)"
+                  value={searchFilters.minPrice}
+                  onChange={(e) => setSearchFilters(prev => ({ ...prev, minPrice: e.target.value }))}
+                  style={{
+                    padding: '12px 16px',
+                    border: '2px solid #ddd',
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    fontFamily: "'Poppins', sans-serif",
+                    background: '#fff',
+                    transition: 'border-color 0.3s ease'
+                  }}
+                />
+                
+                <input
+                  type="text"
+                  placeholder="Max Price (₹)"
+                  value={searchFilters.maxPrice}
+                  onChange={(e) => setSearchFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
+                  style={{
+                    padding: '12px 16px',
+                    border: '2px solid #ddd',
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    fontFamily: "'Poppins', sans-serif",
+                    background: '#fff',
+                    transition: 'border-color 0.3s ease'
+                  }}
+                />
+                
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  style={{
+                    padding: '12px 16px',
+                    border: '2px solid #ddd',
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    fontFamily: "'Poppins', sans-serif",
+                    background: '#fff',
+                    transition: 'border-color 0.3s ease'
+                  }}
+                >
+                  <option value="default">Sort By</option>
+                  <option value="price-asc">Price: Low to High</option>
+                  <option value="price-desc">Price: High to Low</option>
+                  <option value="rooms-asc">Rooms: Low to High</option>
+                  <option value="rooms-desc">Rooms: High to Low</option>
+                  <option value="sqft-asc">Size: Low to High</option>
+                  <option value="sqft-desc">Size: High to Low</option>
+                </select>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button 
                   onClick={handleSearch}
                   className="search-btn"
@@ -513,6 +722,28 @@ export default function Listings() {
                 >
                   Clear Filters
                 </button>
+                
+                {comparisonProperties.length > 0 && (
+                  <button 
+                    onClick={() => setShowComparison(!showComparison)}
+                    className="compare-btn"
+                    style={{
+                      padding: '12px 24px',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      background: '#17a2b8',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <i className="fas fa-balance-scale"></i> Compare ({comparisonProperties.length})
+                  </button>
+                )}
               </div>
             </div>
             
@@ -555,51 +786,141 @@ export default function Listings() {
                     overflow: 'hidden',
                     boxShadow: '0 4px 15px rgba(0, 0, 0, 0.08)',
                     transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                    position: 'relative'
+                    position: 'relative',
+                    cursor: 'pointer'
                   }}
                   onMouseOver={(e) => {
                     e.currentTarget.style.transform = 'translateY(-5px)';
                     e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.12)';
+                    const overlay = e.currentTarget.querySelector('.address-overlay');
+                    if (overlay) {
+                      overlay.style.opacity = '1';
+                      overlay.style.transform = 'translateY(0)';
+                    }
                   }}
                   onMouseOut={(e) => {
                     e.currentTarget.style.transform = 'translateY(0)';
                     e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.08)';
+                    const overlay = e.currentTarget.querySelector('.address-overlay');
+                    if (overlay) {
+                      overlay.style.opacity = '0';
+                      overlay.style.transform = 'translateY(6px)';
+                    }
                   }}
+                  onClick={() => handleViewDetails(property)}
                 >
-                  <img 
-                    src={property.image} 
-                    alt={property.title}
-                    style={{
-                      width: '100%',
-                      height: '220px',
-                      objectFit: 'cover',
-                      display: 'block'
-                    }}
-                  />
-                  
-                  {/* Address overlay on hover */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '12px',
-                    left: '12px',
-                    background: 'rgba(0, 0, 0, 0.85)',
-                    color: '#fff',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    fontSize: '0.85rem',
-                    lineHeight: '1.4',
-                    opacity: '0',
-                    transform: 'translateY(6px)',
-                    transition: 'opacity 0.25s ease, transform 0.25s ease',
-                    zIndex: 2,
-                    pointerEvents: 'none',
-                    maxWidth: 'calc(100% - 24px)',
-                    whiteSpace: 'pre-line',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    {property.address}
-                    {'\n'}{property.phone}
+                  <div style={{ position: 'relative' }}>
+                    <img 
+                      src={property.image} 
+                      alt={property.title}
+                      style={{
+                        width: '100%',
+                        height: '220px',
+                        objectFit: 'cover',
+                        display: 'block'
+                      }}
+                    />
+                    
+                    {/* Action buttons */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '10px',
+                      right: '10px',
+                      display: 'flex',
+                      gap: '8px',
+                      zIndex: 3
+                    }}>
+                      <button
+                        onClick={(e) => handleAddToFavorites(property, e)}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.9)',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '36px',
+                          height: '36px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          fontSize: '1.1rem',
+                          color: '#d90429',
+                          transition: 'all 0.3s ease',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                        }}
+                        title="Add to Favorites"
+                      >
+                        <i className="fas fa-heart"></i>
+                      </button>
+                      
+                      <button
+                        onClick={(e) => handleToggleComparison(property, e)}
+                        style={{
+                          background: comparisonProperties.some(p => p.id === property.id) 
+                            ? 'rgba(23, 162, 184, 0.9)' 
+                            : 'rgba(255, 255, 255, 0.9)',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '36px',
+                          height: '36px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          fontSize: '1rem',
+                          color: comparisonProperties.some(p => p.id === property.id) ? '#fff' : '#17a2b8',
+                          transition: 'all 0.3s ease',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                        }}
+                        title="Compare"
+                      >
+                        <i className="fas fa-balance-scale"></i>
+                      </button>
+                      
+                      <button
+                        onClick={(e) => handleShare(property, e)}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.9)',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '36px',
+                          height: '36px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          fontSize: '1rem',
+                          color: '#333',
+                          transition: 'all 0.3s ease',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                        }}
+                        title="Share"
+                      >
+                        <i className="fas fa-share-alt"></i>
+                      </button>
+                    </div>
+                    
+                    {/* Address overlay on hover */}
+                    <div className="address-overlay" style={{
+                      position: 'absolute',
+                      top: '12px',
+                      left: '12px',
+                      background: 'rgba(0, 0, 0, 0.85)',
+                      color: '#fff',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      lineHeight: '1.4',
+                      opacity: '0',
+                      transform: 'translateY(6px)',
+                      transition: 'opacity 0.25s ease, transform 0.25s ease',
+                      zIndex: 2,
+                      pointerEvents: 'none',
+                      maxWidth: 'calc(100% - 100px)',
+                      whiteSpace: 'pre-line'
+                    }}>
+                      {property.address}
+                      {'\n'}{property.phone}
+                    </div>
                   </div>
                   
                   <div className="card-content" style={{ padding: '20px' }}>
@@ -645,7 +966,10 @@ export default function Listings() {
                       
                       <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                         <button 
-                          onClick={() => handleBooking(property)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBooking(property);
+                          }}
                           className="book-btn"
                           style={{
                             flex: 1,
@@ -661,25 +985,6 @@ export default function Listings() {
                           }}
                         >
                           Book Now
-                        </button>
-                        
-                        <button 
-                          onClick={() => handleAddToFavorites(property)}
-                          style={{
-                            padding: '8px 12px',
-                            background: '#fff',
-                            color: 'var(--primary-color)',
-                            border: '2px solid var(--primary-color)',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                          title="Add to Favorites"
-                        >
-                          <i className="fas fa-heart"></i>
                         </button>
                       </div>
                     </div>
@@ -769,6 +1074,266 @@ export default function Listings() {
           </div>
         </section>
       </main>
+      
+      {/* Property Detail Modal */}
+      {selectedProperty && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 10000,
+            padding: '20px'
+          }}
+          onClick={() => setSelectedProperty(null)}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '12px',
+              maxWidth: '800px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              position: 'relative'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setSelectedProperty(null)}
+              style={{
+                position: 'absolute',
+                top: '15px',
+                right: '15px',
+                background: 'rgba(0, 0, 0, 0.5)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                cursor: 'pointer',
+                fontSize: '1.2rem',
+                zIndex: 1
+              }}
+            >
+              ×
+            </button>
+            
+            <img
+              src={selectedProperty.image}
+              alt={selectedProperty.title}
+              style={{
+                width: '100%',
+                height: '400px',
+                objectFit: 'cover',
+                display: 'block'
+              }}
+            />
+            
+            <div style={{ padding: '30px' }}>
+              <h2 style={{ fontSize: '2rem', marginBottom: '15px', color: '#2b2d42' }}>
+                {selectedProperty.title}
+              </h2>
+              
+              <div style={{
+                display: 'flex',
+                gap: '20px',
+                marginBottom: '20px',
+                color: '#666',
+                fontSize: '1rem'
+              }}>
+                <span>
+                  <i className="fas fa-bed" style={{ marginRight: '5px', color: '#2b2d42' }}></i>
+                  {selectedProperty.beds} Bed{selectedProperty.beds > 1 ? 's' : ''}
+                </span>
+                <span>
+                  <i className="fas fa-bath" style={{ marginRight: '5px', color: '#2b2d42' }}></i>
+                  {selectedProperty.baths} Bath{selectedProperty.baths > 1 ? 's' : ''}
+                </span>
+                <span>
+                  <i className="fas fa-ruler-combined" style={{ marginRight: '5px', color: '#2b2d42' }}></i>
+                  {selectedProperty.sqft} sqft
+                </span>
+              </div>
+              
+              <p style={{ color: '#666', marginBottom: '20px', fontSize: '1.1rem' }}>
+                <i className="fas fa-map-marker-alt" style={{ marginRight: '8px', color: '#d90429' }}></i>
+                {selectedProperty.address}
+              </p>
+              
+              <p style={{ color: '#666', marginBottom: '20px', fontSize: '1rem' }}>
+                <i className="fas fa-phone" style={{ marginRight: '8px', color: '#d90429' }}></i>
+                {selectedProperty.phone}
+              </p>
+              
+              <p style={{
+                fontSize: '2rem',
+                fontWeight: '600',
+                color: '#d90429',
+                marginBottom: '30px'
+              }}>
+                {selectedProperty.price}
+              </p>
+              
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBooking(selectedProperty);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '12px 24px',
+                    background: '#d90429',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Book Now
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddToFavorites(selectedProperty, e);
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    background: '#fff',
+                    color: '#d90429',
+                    border: '2px solid #d90429',
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <i className="fas fa-heart" style={{ marginRight: '8px' }}></i> Favorite
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Comparison Modal */}
+      {showComparison && comparisonProperties.length > 0 && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 10000,
+            padding: '20px'
+          }}
+          onClick={() => setShowComparison(false)}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '12px',
+              maxWidth: '1200px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              position: 'relative',
+              padding: '30px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+              <h2 style={{ fontSize: '2rem', color: '#2b2d42' }}>Compare Properties</h2>
+              <button
+                onClick={() => setShowComparison(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '2rem',
+                  cursor: 'pointer',
+                  color: '#666'
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${comparisonProperties.length}, 1fr)`,
+              gap: '20px',
+              overflowX: 'auto'
+            }}>
+              {comparisonProperties.map((property) => (
+                <div key={property.id} style={{
+                  border: '1px solid #eee',
+                  borderRadius: '8px',
+                  overflow: 'hidden'
+                }}>
+                  <img
+                    src={property.image}
+                    alt={property.title}
+                    style={{
+                      width: '100%',
+                      height: '200px',
+                      objectFit: 'cover'
+                    }}
+                  />
+                  <div style={{ padding: '20px' }}>
+                    <h3 style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#2b2d42' }}>
+                      {property.title}
+                    </h3>
+                    <p style={{ color: '#666', marginBottom: '5px', fontSize: '0.9rem' }}>
+                      <i className="fas fa-bed"></i> {property.beds} Bed{property.beds > 1 ? 's' : ''}
+                    </p>
+                    <p style={{ color: '#666', marginBottom: '5px', fontSize: '0.9rem' }}>
+                      <i className="fas fa-bath"></i> {property.baths} Bath{property.baths > 1 ? 's' : ''}
+                    </p>
+                    <p style={{ color: '#666', marginBottom: '10px', fontSize: '0.9rem' }}>
+                      <i className="fas fa-ruler-combined"></i> {property.sqft} sqft
+                    </p>
+                    <p style={{ fontSize: '1.3rem', fontWeight: '600', color: '#d90429', marginBottom: '10px' }}>
+                      {property.price}
+                    </p>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleComparison(property, e);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        background: '#dc3545',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem'
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       
       <Footer />
 

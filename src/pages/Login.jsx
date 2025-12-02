@@ -36,7 +36,7 @@ export default function Login() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      const role = localStorage.getItem('role') || 'user';
+      const role = user.role || 'user';
       navigate(role === 'landlord' ? '/landlord' : '/');
     }
   }, [user, navigate]);
@@ -66,21 +66,7 @@ export default function Login() {
     });
   };
 
-  // Read users from localStorage
-  const readUsers = () => {
-    try {
-      return JSON.parse(localStorage.getItem('users') || '[]');
-    } catch (e) {
-      return [];
-    }
-  };
-
-  // Save users to localStorage
-  const saveUsers = (users) => {
-    localStorage.setItem('users', JSON.stringify(users));
-  };
-
-  // Handle signup form submission
+  // Handle signup form submission with MongoDB API
   const handleSignup = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -126,58 +112,62 @@ export default function Login() {
       return;
     }
 
-    // Check for duplicate username or email
-    const users = readUsers();
-    const usernameExists = users.some(u => u.username.toLowerCase() === signupData.username.trim().toLowerCase());
-    const emailExists = users.some(u => u.email.toLowerCase() === signupData.email.trim().toLowerCase());
-    
-    if (usernameExists) {
-      newErrors.username = 'Username already taken.';
-      setErrors(newErrors);
+    try {
+      // Call signup API
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: signupData.username.trim(),
+          email: signupData.email.trim(),
+          password: signupData.password,
+          confirmPassword: signupData.confirmPassword,
+          role: signupData.role
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        // Handle different error types
+        if (data.message.includes('Username')) {
+          newErrors.username = data.message;
+        } else if (data.message.includes('email') || data.message.includes('Email')) {
+          newErrors.email = data.message;
+        } else if (data.message.includes('Password')) {
+          newErrors.password = data.message;
+        } else {
+          newErrors.general = data.message || 'Signup failed. Please try again.';
+        }
+        setErrors(newErrors);
+        setLoading(false);
+        return;
+      }
+
+      // Signup successful
+      const currentUser = {
+        username: data.user.username,
+        email: data.user.email,
+        role: data.user.role
+      };
+
+      // Login will store all data in localStorage
+      login(currentUser);
+
       setLoading(false);
-      return;
-    }
-    
-    if (emailExists) {
-      newErrors.email = 'An account with this email already exists.';
-      setErrors(newErrors);
+      
+      // Redirect based on role
+      navigate(currentUser.role === 'landlord' ? '/landlord' : '/');
+    } catch (error) {
+      console.error('Signup error:', error);
+      setErrors({ general: 'Network error. Please check if the server is running.' });
       setLoading(false);
-      return;
     }
-
-    // Create user object
-    const userObj = {
-      username: signupData.username.trim(),
-      email: signupData.email.trim(),
-      role: signupData.role,
-      password: btoa(signupData.password) // Light obfuscation
-    };
-
-    // Save user
-    users.push(userObj);
-    saveUsers(users);
-
-    // Set current user and login
-    const currentUser = { 
-      username: userObj.username, 
-      email: userObj.email, 
-      role: userObj.role 
-    };
-    
-    login(currentUser);
-    
-    // Set additional localStorage items
-    localStorage.setItem('username', currentUser.username);
-    localStorage.setItem('email', currentUser.email);
-    localStorage.setItem('role', currentUser.role);
-
-    setLoading(false);
-    
-    // Redirect based on role
-    navigate(userObj.role === 'landlord' ? '/landlord' : '/');
   };
 
-  // Handle login form submission
+  // Handle login form submission with MongoDB API
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -206,56 +196,57 @@ export default function Login() {
       return;
     }
 
-    // Check users
-    const users = readUsers();
-    if (!users.length) {
-      alert('No accounts found. Please sign up first.');
+    try {
+      // Call login API
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: loginData.username.trim(),
+          password: loginData.password,
+          role: loginData.role
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        // Handle different error types
+        if (data.message.includes('username') || data.message.includes('Username')) {
+          newErrors.username = data.message;
+        } else if (data.message.includes('password') || data.message.includes('Password')) {
+          newErrors.password = data.message;
+        } else if (data.message.includes('role') || data.message.includes('Role')) {
+          newErrors.role = data.message;
+        } else {
+          newErrors.general = data.message || 'Login failed. Please try again.';
+        }
+        setErrors(newErrors);
+        setLoading(false);
+        return;
+      }
+
+      // Login successful
+      const currentUser = {
+        username: data.user.username,
+        email: data.user.email,
+        role: data.user.role
+      };
+
+      // Login will store all data in localStorage
+      login(currentUser);
+
       setLoading(false);
-      return;
-    }
-
-    const found = users.find(u => u.username.toLowerCase() === loginData.username.trim().toLowerCase());
-    if (!found) {
-      newErrors.username = 'No account found with this username.';
-      setErrors(newErrors);
+      
+      // Redirect based on role
+      navigate(currentUser.role === 'landlord' ? '/landlord' : '/');
+    } catch (error) {
+      console.error('Login error:', error);
+      setErrors({ general: 'Network error. Please check if the server is running.' });
       setLoading(false);
-      return;
     }
-
-    // Compare password
-    if (found.password !== btoa(loginData.password)) {
-      newErrors.password = 'Invalid password.';
-      setErrors(newErrors);
-      setLoading(false);
-      return;
-    }
-
-    // Check role match
-    if (found.role !== loginData.role) {
-      newErrors.role = 'Selected role does not match registered role.';
-      setErrors(newErrors);
-      setLoading(false);
-      return;
-    }
-
-    // Successful login
-    const currentUser = { 
-      username: found.username, 
-      email: found.email, 
-      role: found.role 
-    };
-    
-    login(currentUser);
-    
-    // Set additional localStorage items
-    localStorage.setItem('username', currentUser.username);
-    localStorage.setItem('email', currentUser.email);
-    localStorage.setItem('role', currentUser.role);
-
-    setLoading(false);
-    
-    // Redirect based on role
-    navigate(found.role === 'landlord' ? '/landlord' : '/');
   };
 
   // Handle input changes
@@ -315,6 +306,20 @@ export default function Login() {
                   width: '100%'
                 }}>
                   <h2 style={{ textAlign: 'center', marginBottom: '30px', color: '#333' }}>Sign Up</h2>
+                  {errors.general && (
+                    <div style={{
+                      padding: '12px',
+                      marginBottom: '20px',
+                      backgroundColor: '#fee',
+                      border: '1px solid #dc3545',
+                      borderRadius: '8px',
+                      color: '#dc3545',
+                      textAlign: 'center',
+                      fontSize: '0.9rem'
+                    }}>
+                      {errors.general}
+                    </div>
+                  )}
                   <form onSubmit={handleSignup}>
                     <div className="input-group" style={{
                       position: 'relative',
@@ -545,6 +550,20 @@ export default function Login() {
                   width: '100%'
                 }}>
                   <h2 style={{ textAlign: 'center', marginBottom: '30px', color: '#333' }}>Sign In</h2>
+                  {errors.general && (
+                    <div style={{
+                      padding: '12px',
+                      marginBottom: '20px',
+                      backgroundColor: '#fee',
+                      border: '1px solid #dc3545',
+                      borderRadius: '8px',
+                      color: '#dc3545',
+                      textAlign: 'center',
+                      fontSize: '0.9rem'
+                    }}>
+                      {errors.general}
+                    </div>
+                  )}
                   <form onSubmit={handleLogin}>
                     <div className="input-group" style={{
                       position: 'relative',

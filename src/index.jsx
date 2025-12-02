@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import Router from './router';
 import { UserProvider } from './contexts/UserContext';
+import { ToastProvider } from './components/Toast';
 import './index.css';
 
 // Create root element
@@ -36,7 +37,9 @@ document.head.appendChild(faviconLink);
 createRoot(rootElement).render(
   <React.StrictMode>
     <UserProvider>
-      <Router />
+      <ToastProvider>
+        <Router />
+      </ToastProvider>
     </UserProvider>
   </React.StrictMode>
 );
